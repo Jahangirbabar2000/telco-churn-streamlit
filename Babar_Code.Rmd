@@ -1,0 +1,199 @@
+---
+title: "Customer Churn Analysis"
+author: "Jahangir Babar"
+output: html_document
+date: "2025-04-01"
+---
+
+# 1. Scenario Identification
+
+## 1.1 Central Question
+**What are the key factors that drive customer churn in a telecom company, and how can we identify customers at risk of leaving?**
+
+## 1.2 Why is it Important?
+Customer churn refers to the phenomenon where customers discontinue their subscription or stop doing business with a company. Predicting churn is vital for businesses as retaining existing customers is often more cost-effective than acquiring new ones. By analyzing historical data, companies can identify patterns and factors that contribute to customer attrition, enabling proactive retention strategies.
+
+## 1.3 Objective
+The objective of this analysis is to explore the Telco Customer Churn dataset to understand the factors that contribute to customer churn in a telecommunications company. By cleaning and visualizing the data in R, I aim to uncover patterns across customer segments and prepare the dataset for predictive modeling in Python. The ultimate goal is to identify high-risk churn profiles to help the company implement proactive retention strategies.
+
+# 2. Dataset Description
+
+## 2.1 Source and URL
+- **Source:** Kaggle  
+- **URL:** https://www.kaggle.com/datasets/blastchar/telco-customer-churn
+
+## 2.2 Key Variables
+The Telco Customer Churn dataset contains information about customer demographics, subscription details, usage metrics, and whether the customer has churned. Notable features include:
+
+### Customer Demographics
+- Gender
+- Senior citizen status
+- Partner status
+- Dependents
+
+### Financial Metrics
+- Tenure (months as customer)
+- Monthly charges
+- Total charges
+
+### Service Information
+- Contract type
+- Payment method
+- Internet service type
+
+### Target Variable
+- Churn (whether customer left the service)
+
+## 2.3 Dataset Requirements Met
+The Telco Customer Churn dataset meets all requirements for this project. It contains over 7,000 rows and 21 columns, providing a rich sample size for analysis. The dataset includes both categorical and numerical variables, which allow for meaningful data cleaning, visualization, and predictive modeling. It also contains missing values in the TotalCharges column, enabling demonstration of data imputation techniques. Lastly, the dataset represents a realistic business scenario relevant to telecom and customer retention, making it suitable for generating actionable insights through statistical data analysis.
+
+# 3. Data Cleaning and Missing Values
+
+```{r}
+#3.1 Data Types and Structure
+library(tidyverse)
+telco <- read.csv("Telco-Customer-Churn.csv", stringsAsFactors = FALSE)
+
+glimpse(telco)   # View structure of variables
+```
+
+## 3.2 Missing Values and Anomalies
+```{r missing-values}
+# Count missing values and summarize the TotalCharges column
+colSums(is.na(telco))
+summary(telco$TotalCharges)
+```
+
+```{r view-nas}
+# View rows with non-numeric TotalCharges values (blanks)
+telco[is.na(as.numeric(telco$TotalCharges)), c("customerID", "tenure", "TotalCharges")]
+```
+The `TotalCharges` column had missing entries due to blank strings stored as text. These cases matched customers with `tenure = 0`. After conversion to numeric, missing values were imputed as 0.
+
+```{r clean-totalcharges}
+# Convert TotalCharges to numeric and impute missing values with 0
+telco$TotalCharges <- as.numeric(telco$TotalCharges)
+telco$TotalCharges[is.na(telco$TotalCharges)] <- 0
+```
+
+## 3.3 Visual Summary of Initial Data
+```{r histogram-tenure}
+# Plot distribution of tenure
+ggplot(telco, aes(x = tenure)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  labs(title = "Distribution of Customer Tenure", x = "Tenure (Months)", y = "Count")
+```
+
+```{r histogram-charges}
+# Plot distribution of monthly charges
+ggplot(telco, aes(x = MonthlyCharges)) +
+  geom_histogram(binwidth = 5, fill = "darkorange", color = "white") +
+  labs(title = "Distribution of Monthly Charges", x = "Monthly Charges", y = "Count")
+```
+
+## 4.1 Cleaning Steps
+- Converted `TotalCharges` from character to numeric
+- Imputed missing `TotalCharges` values with 0
+- Confirmed all other variables had no missing data
+- Converted categorical character variables (e.g. `SeniorCitizen`, `Churn`) to factors for analysis
+- Verified data structure using `str()` and `skim()` functions
+
+```{r cleaning-structure}
+# Check structure and convert appropriate columns to factor
+str(telco)
+telco$SeniorCitizen <- as.factor(telco$SeniorCitizen)
+telco$Churn <- as.factor(telco$Churn)
+```
+
+## 4.2 Rationale for Imputation
+The missing values in `TotalCharges` correspond to new customers (`tenure = 0`) who hadn't been billed yet. Replacing these with 0 maintains the logic of billing without distorting numerical summaries. Converting character columns to factors improves handling in visualizations and modeling.
+
+# 5. Exploratory Data Analysis (EDA)
+
+### Churn by Contract Type
+
+```{r churn-contract}
+# Visualize churn rate by contract type
+ggplot(telco, aes(x = Contract, fill = Churn)) +
+  geom_bar(position = "fill") +
+  ylab("Proportion") +
+  ggtitle("Churn Rate by Contract Type")
+```
+
+
+Customers with month-to-month contracts exhibit a much higher churn rate compared to those with one-year or two-year contracts. This suggests that short-term contract customers are more likely to leave, possibly due to less commitment or greater dissatisfaction.
+
+### Monthly Charges Distribution by Churn
+```{r monthlycharges-hist}
+# Compare MonthlyCharges distribution by churn status
+ggplot(telco, aes(x = MonthlyCharges, fill = Churn)) +
+  geom_histogram(position = "identity", alpha = 0.6, bins = 30) +
+  ggtitle("Monthly Charges Distribution")
+```
+
+Customers with higher monthly charges are more likely to churn. The distribution shows a clear skew in churned customers toward the higher end of the pricing spectrum, indicating that cost may be a factor influencing churn.
+
+### Tenure by Churn
+```{r tenure-churn}
+# Visualize how tenure varies for churned vs. non-churned customers
+ggplot(telco, aes(x = tenure, fill = Churn)) +
+  geom_histogram(binwidth = 5, position = "identity", alpha = 0.7) +
+  ggtitle("Tenure Distribution by Churn")
+```
+
+Customers with lower tenure (shorter relationship with the company) have a significantly higher churn rate. This suggests that newer customers are more likely to leave early, potentially due to onboarding issues or unmet expectations.
+
+### Internet Service Type by Churn
+```{r internet-churn}
+# Bar plot of churn by Internet service type
+ggplot(telco, aes(x = InternetService, fill = Churn)) +
+  geom_bar(position = "fill") +
+  ylab("Proportion") +
+  ggtitle("Churn Rate by Internet Service Type")
+```
+
+Churn is notably higher among customers using Fiber optic and DSL services compared to those without internet service. This implies that dissatisfaction with internet service quality or cost may be driving churn for connected customers.
+
+### Payment Method by Churn
+```{r payment-churn}
+# Bar plot of churn by payment method
+ggplot(telco, aes(x = PaymentMethod, fill = Churn)) +
+  geom_bar(position = "fill") +
+  ylab("Proportion") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Churn Rate by Payment Method")
+```
+Customers using electronic check as their payment method show the highest churn rate, while those using credit cards or automatic bank transfers churn less frequently. This may suggest a correlation between payment flexibility, automation, and retention.
+
+
+
+```{r}
+# Drop customerID before exporting
+telco_clean <- telco %>% select(-customerID)
+
+# Export cleaned dataset
+write.csv(telco_clean, "Babar_Telco_Cleaned.csv", row.names = FALSE)
+
+```
+
+The cleaned and preprocessed dataset was then saved as a CSV file named Babar_Telco_Cleaned.csv. This step ensures continuity and consistency when transitioning from R to Python, allowing the modeling phase to begin with a clean, reliable dataset.
+By exporting at this stage, we separate the data wrangling and visualization tasks handled in R from the machine learning and deployment tasks planned in Python. The next phase of the project will involve:
+•	Performing additional encoding on categorical variables using one-hot encoding
+•	Splitting the data into training and testing sets
+•	Building a classification model (e.g., Random Forest) to predict churn
+•	Evaluating the model’s performance using accuracy, recall, and precision metrics
+•	Deploying an interactive Streamlit dashboard for real-time churn prediction
+
+
+
+
+
+
+
+
+
+
+
+
+
+
